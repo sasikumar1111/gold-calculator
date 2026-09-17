@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#10131a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
 <title>Gold Price Calculator</title>
 <style>
 body{font-family:Arial,sans-serif;margin:0;background:#10131a;color:#f4f6f8;padding:20px}
@@ -85,7 +90,8 @@ The automatic rate is a live spot-market reference converted to INR and adjusted
 let purity=22;
 let rateMode='auto';
 // Auto rates are kept separately so changing purity always changes the displayed rate.
-let autoRates={24:null,22:null,18:null};
+// Start with the latest known Bangalore 22K reference so purity switching works immediately.
+let autoRates={24:15284,22:14010,18:11468};
 
 const rate=document.getElementById('rate');
 const weight=document.getElementById('weight');
@@ -195,7 +201,16 @@ async function updateLiveRate(){
 }
 
 document.getElementById('refresh').addEventListener('click',updateLiveRate);
+
+// Initialize the selected purity's rate immediately, then refresh from the live feed.
+applyAutoRateForPurity();
 calculate();
+setTimeout(updateLiveRate, 300);
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+}
 </script>
 </body>
 </html>
