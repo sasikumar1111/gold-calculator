@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10131a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Gold Calculator">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Gold Price Calculator</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#10131a;color:#f4f6f8;padding:20px}
+.card{max-width:520px;margin:auto;background:#171b23;border:1px solid #28313b;border-radius:18px;padding:20px}
+h1{margin:0 0 18px;font-size:28px}
+label{display:block;margin:14px 0 7px;color:#b9c0ca;font-weight:600}
+input,select,button{width:100%;box-sizing:border-box;padding:13px;border-radius:10px;border:1px solid #35404d;background:#0f1218;color:#fff;font-size:16px}
+input:disabled{opacity:.65}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.purity{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.purity button{cursor:pointer}
+.purity button.active{background:#16a765;border-color:#16a765}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+button.calc,button.refresh{background:#16a765;border:0;font-weight:700;cursor:pointer}
+button.edit{background:#26303a;border-color:#465362;cursor:pointer}
+.status{margin-top:10px;font-size:13px;color:#9da6b1;line-height:1.45}
+.result{margin-top:20px;border:1px solid #167a58;border-radius:14px;overflow:hidden}
+.line{display:flex;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #29333d}
+.line strong{white-space:nowrap}
+.total{background:#0d3028;padding:18px}
+.total strong{display:block;font-size:30px;color:#20c77c;margin-top:4px}
+.small{font-size:13px;color:#9da6b1;margin-top:12px;line-height:1.5}
+@media(max-width:380px){body{padding:10px}.card{padding:16px}.row,.actions{grid-template-columns:1fr}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Gold Price Calculator</h1>
+
+<label>Gold Rate (₹ / gram)</label>
+<input id="rate" type="number" min="0" step="0.01" value="14010">
+<div id="rateHint" class="status">Today's 22K reference rate: ₹14,010/g (Bangalore reference).</div>
+
+<label>Purity</label>
+<div class="purity">
+<button data-p="24">24K</button>
+<button data-p="22" class="active">22K</button>
+<button data-p="18">18K</button>
+</div>
+
+<div class="row">
+<div>
+<label>Weight (grams)</label>
+<input id="weight" type="number" min="0" step="0.001" value="8">
+</div>
+<div>
+<label>Making (%)</label>
+<input id="making" type="number" min="0" step="0.01" value="12">
+</div>
+</div>
+
+<label>GST</label>
+<select id="gst">
+<option value="3">Incl. 3%</option>
+<option value="0">Excl. GST</option>
+</select>
+
+<div class="actions">
+<button class="refresh" id="refresh">↻ Update Rate</button>
+<button class="edit" id="edit" type="button">✎ Edit Rate</button>
+</div>
+<div id="status" class="status">Rate is editable. Tap “Update Rate” to fetch a current live market reference.</div>
+
+<button class="calc" id="calculate" type="button" style="margin-top:10px">Calculate</button>
+
+<div class="result">
+<div class="line"><span>Base value</span><strong id="base">₹0</strong></div>
+<div class="line"><span>Making charges</span><strong id="makingAmt">₹0</strong></div>
+<div class="line"><span>GST</span><strong id="gstAmt">₹0</strong></div>
+<div class="total"><div>Total Amount</div><strong id="total">₹0</strong><div class="small">Includes all entered charges.</div></div>
+</div>
+
+<div class="small">
+The automatic rate is a live spot-market reference converted to INR and adjusted for purity. Jewellery-shop rates can differ because of local premiums, wastage and jeweller pricing. Always confirm the final rate with your jeweller.
+</div>
+</div>
+
+<script>
+let purity=22;
+let rateMode='auto';
+
+const rate=document.getElementById('rate');
+const weight=document.getElementById('weight');
+const making=document.getElementById('making');
+const gst=document.getElementById('gst');
+const statusEl=document.getElementById('status');
+
+function money(n){
+  return '₹'+Math.round(n).toLocaleString('en-IN');
+}
+
+function selectedRate(){
+  return Math.max(0,Number(rate.value)||0);
+}
+
+function calculate(){
+  const r=selectedRate();
+  const w=Math.max(0,Number(weight.value)||0);
+  const m=Math.max(0,Number(making.value)||0);
+  const g=Math.max(0,Number(gst.value)||0);
+
+  // Rate field is always the selected-purity rate.
+  const base=r*w;
+  const make=base*m/100;
+  const taxable=base+make;
+  const tax=taxable*g/100;
+
+  document.getElementById('rateHint').textContent =
+    'Rate used: '+money(r)+'/g for '+purity+'K gold.';
+  document.getElementById('base').textContent=money(base);
+  document.getElementById('makingAmt').textContent=money(make);
+  document.getElementById('gstAmt').textContent=money(tax);
+  document.getElementById('total').textContent=money(taxable+tax);
+}
+
+document.querySelectorAll('.purity button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    purity=Number(b.dataset.p);
+    document.querySelectorAll('.purity button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    calculate();
+  });
+});
+
+document.getElementById('edit').addEventListener('click',()=>{
+  rateMode='manual';
+  rate.disabled=false;
+  rate.focus();
+  statusEl.textContent='Manual mode: you can enter your jeweller/Goodreturns rate.';
+});
+
+document.getElementById('calculate').addEventListener('click',calculate);
+[rate,weight,making,gst].forEach(x=>x.addEventListener('input',calculate));
+
+async function updateLiveRate(){
+  const btn=document.getElementById('refresh');
+  btn.disabled=true;
+  statusEl.textContent='Updating live market rate…';
+
+  try{
+    // Public, no-key live XAU/USD endpoint.
+    const goldRes=await fetch('https://api.gold-api.com/price/XAU',{cache:'no-store'});
+    if(!goldRes.ok) throw new Error('Gold rate request failed');
+    const goldData=await goldRes.json();
+
+    // Public USD/INR exchange-rate endpoint.
+    const fxRes=await fetch('https://open.er-api.com/v6/latest/USD',{cache:'no-store'});
+    if(!fxRes.ok) throw new Error('FX request failed');
+    const fxData=await fxRes.json();
+
+    const usdPerOz=Number(goldData.price);
+    const usdInr=Number(fxData.rates && fxData.rates.INR);
+
+    if(!Number.isFinite(usdPerOz)||!Number.isFinite(usdInr)||usdPerOz<=0||usdInr<=0){
+      throw new Error('Invalid live rate');
+    }
+
+    const perGram24=usdPerOz/31.1034768*usdInr;
+    const purityFactor=purity/24;
+    const selectedPerGram=perGram24*purityFactor;
+
+    rate.value=selectedPerGram.toFixed(2);
+    rateMode='auto';
+    rate.disabled=true;
+    statusEl.textContent='Live spot reference updated. Tap “Edit Rate” if you want to enter a local jeweller rate.';
+    calculate();
+  }catch(err){
+    // Keep the known current Bangalore reference rather than showing a broken value.
+    rate.disabled=false;
+    statusEl.textContent='Could not refresh the live feed. You can edit the rate manually.';
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+document.getElementById('refresh').addEventListener('click',updateLiveRate);
+calculate();
+</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});</script>
+</body>
+</html>

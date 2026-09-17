@@ -1,0 +1,18 @@
+{
+  "name": "Gold Price Calculator",
+  "short_name": "Gold Calculator",
+  "description": "Gold jewellery price calculator with purity, making charges and GST.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10131a",
+  "theme_color": "#10131a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
