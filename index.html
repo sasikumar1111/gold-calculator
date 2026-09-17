@@ -4,11 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#10131a">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Gold Calculator">
-<link rel="manifest" href="manifest.webmanifest">
 <title>Gold Price Calculator</title>
 <style>
 body{font-family:Arial,sans-serif;margin:0;background:#10131a;color:#f4f6f8;padding:20px}
@@ -89,6 +84,8 @@ The automatic rate is a live spot-market reference converted to INR and adjusted
 <script>
 let purity=22;
 let rateMode='auto';
+// Auto rates are kept separately so changing purity always changes the displayed rate.
+let autoRates={24:null,22:null,18:null};
 
 const rate=document.getElementById('rate');
 const weight=document.getElementById('weight');
@@ -102,6 +99,16 @@ function money(n){
 
 function selectedRate(){
   return Math.max(0,Number(rate.value)||0);
+}
+
+function applyAutoRateForPurity(){
+  const r=autoRates[purity];
+  if(Number.isFinite(r)){
+    rate.value=r.toFixed(2);
+    rate.disabled=true;
+    document.getElementById('rateHint').textContent =
+      'Automatic rate: ₹'+Math.round(r).toLocaleString('en-IN')+'/g for '+purity+'K gold.';
+  }
 }
 
 function calculate(){
@@ -129,6 +136,7 @@ document.querySelectorAll('.purity button').forEach(b=>{
     purity=Number(b.dataset.p);
     document.querySelectorAll('.purity button').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
+    if(rateMode==='auto') applyAutoRateForPurity();
     calculate();
   });
 });
@@ -167,12 +175,14 @@ async function updateLiveRate(){
     }
 
     const perGram24=usdPerOz/31.1034768*usdInr;
-    const purityFactor=purity/24;
-    const selectedPerGram=perGram24*purityFactor;
 
-    rate.value=selectedPerGram.toFixed(2);
+    // Keep a separate automatic rate for each purity.
+    autoRates[24]=perGram24;
+    autoRates[22]=perGram24*(22/24);
+    autoRates[18]=perGram24*(18/24);
+
     rateMode='auto';
-    rate.disabled=true;
+    applyAutoRateForPurity();
     statusEl.textContent='Live spot reference updated. Tap “Edit Rate” if you want to enter a local jeweller rate.';
     calculate();
   }catch(err){
@@ -187,6 +197,5 @@ async function updateLiveRate(){
 document.getElementById('refresh').addEventListener('click',updateLiveRate);
 calculate();
 </script>
-<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});</script>
 </body>
 </html>
