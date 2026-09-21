@@ -2,7 +2,8 @@ name: Update Bangalore Gold Rates
 
 on:
   schedule:
-    - cron: '5 * * * *'
+    # Runs once every day at 10:00 AM IST (04:30 UTC)
+    - cron: '30 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,6 +12,7 @@ permissions:
 jobs:
   update-rates:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,63 +20,94 @@ jobs:
       - name: Fetch Goodreturns Bangalore rate
         run: |
           python - <<'PY'
-          import json, re, urllib.request
+          import json
+          import re
+          import urllib.request
           from datetime import datetime, timezone
+          from html import unescape
 
           url = "https://www.goodreturns.in/gold-rates/bangalore.html"
+
           req = urllib.request.Request(
               url,
-              headers={"User-Agent": "Mozilla/5.0 (compatible; GoldCalculator/1.0)"}
+              headers={
+                  "User-Agent": (
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/140.0.0.0 Safari/537.36"
+                  )
+              }
           )
-          html = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "ignore")
 
-          # Goodreturns exposes the Bangalore 24K/22K/18K values in the page HTML.
-          # Extract the first matching values near the current-page rate labels.
-          patterns = {
-              "24K": [
-                  r'24K\s*Gold\s*/g.*?₹\s*([\d,]+)',
-                  r'24K.*?₹\s*([\d,]+).*?22K',
-              ],
-              "22K": [
-                  r'22K\s*Gold\s*/g.*?₹\s*([\d,]+)',
-                  r'22K.*?₹\s*([\d,]+).*?18K',
-              ],
-              "18K": [
-                  r'18K\s*Gold\s*/g.*?₹\s*([\d,]+)',
-                  r'18K.*?₹\s*([\d,]+)',
-              ],
-          }
+          html = urllib.request.urlopen(req, timeout=30).read().decode(
+              "utf-8",
+              "ignore"
+          )
+
+          html = unescape(html)
+
+          # Convert HTML to plain text
+          text = re.sub(r"<[^>]+>", " ", html)
+          text = re.sub(r"\s+", " ", text)
 
           rates = {}
-          for key, pats in patterns.items():
-              for pat in pats:
-                  m = re.search(pat, html, re.I | re.S)
-                  if m:
-                      value = int(m.group(1).replace(",", ""))
-                      if 1000 < value < 30000:
-                          rates[key] = value
-                          break
 
-          if set(rates) != {"24K", "22K", "18K"}:
-              raise SystemExit(f"Could not parse all Bangalore rates: {rates}")
+          patterns = {
+              "24K": r"24K\s*Gold\s*/g\s*₹\s*([\d,]+)",
+              "22K": r"22K\s*Gold\s*/g\s*₹\s*([\d,]+)",
+              "18K": r"18K\s*Gold\s*/g\s*₹\s*([\d,]+)",
+          }
+
+          for key, pattern in patterns.items():
+              match = re.search(pattern, text, re.IGNORECASE)
+
+              if match:
+                  value = int(match.group(1).replace(",", ""))
+
+                  if 1000 < value < 30000:
+                      rates[key] = value
+
+          print("Parsed Bangalore rates:")
+          print(rates)
+
+          if set(rates.keys()) != {"24K", "22K", "18K"}:
+              raise SystemExit(
+                  f"Could not parse all Bangalore rates: {rates}"
+              )
+
+          # Make sure the values are not accidentally identical
+          if len(set(rates.values())) != 3:
+              raise SystemExit(
+                  f"Invalid rates parsed: {rates}"
+              )
 
           data = {
               "city": "Bangalore",
               "source": "Goodreturns",
               "rates": rates,
-              "updated": datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC")
+              "updated": datetime.now(timezone.utc).strftime(
+                  "%d %b %Y %H:%M UTC"
+              )
           }
 
           with open("rates.json", "w", encoding="utf-8") as f:
               json.dump(data, f, indent=2)
               f.write("\n")
-          print(data)
+
+          print("Updated rates successfully:")
+          print(json.dumps(data, indent=2))
           PY
 
       - name: Commit changed rate
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add rates.json
-          git diff --cached --quiet || git commit -m "Update Bangalore gold rates"
-          git push
+
+          if git diff --cached --quiet; then
+            echo "No rate changes detected."
+          else
+            git commit -m "Update Bangalore gold rates"
+            git push
+          fi
